@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Send, Bot, User } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { VoiceInterface } from "./VoiceInterface";
+import { Separator } from "@/components/ui/separator";
 
 interface Message {
   id: string;
@@ -82,6 +84,19 @@ export const ChatInterface = () => {
     }
   };
 
+  const handleVoiceTranscript = (text: string, isUser: boolean) => {
+    if (!text.trim()) return;
+    
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      role: isUser ? "user" : "assistant",
+      content: text,
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, newMessage]);
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="border-b bg-card px-6 py-4">
@@ -143,7 +158,11 @@ export const ChatInterface = () => {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="border-t bg-card p-6">
+      <div className="border-t bg-card p-6 space-y-4">
+        <VoiceInterface onTranscript={handleVoiceTranscript} />
+        
+        <Separator className="my-2" />
+        
         <div className="flex gap-2">
           <Input
             value={input}
