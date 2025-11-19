@@ -21,16 +21,14 @@ serve(async (req) => {
   socket.onopen = () => {
     console.log("Client connected to Supabase WebSocket");
     
-    // Connect to OpenAI Realtime API
-    openAISocket = new WebSocket(
-      "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01",
-      {
-        headers: {
-          "Authorization": `Bearer ${OPENAI_API_KEY}`,
-          "OpenAI-Beta": "realtime=v1",
-        },
-      }
-    );
+    // Connect to OpenAI Realtime API with proper format
+    const openAIUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01`;
+    
+    openAISocket = new WebSocket(openAIUrl, [
+      "realtime",
+      `openai-insecure-api-key.${OPENAI_API_KEY}`,
+      "openai-beta.realtime-v1"
+    ]);
 
     openAISocket.onopen = () => {
       console.log("Connected to OpenAI Realtime API");
