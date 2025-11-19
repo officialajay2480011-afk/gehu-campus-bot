@@ -55,6 +55,14 @@ Be friendly, professional, and helpful. If you don't know specific information, 
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error("AI gateway error details:", {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+      
       if (response.status === 429) {
         return new Response(
           JSON.stringify({ error: "Rate limits exceeded, please try again later." }),
@@ -67,10 +75,9 @@ Be friendly, professional, and helpful. If you don't know specific information, 
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
+      
       return new Response(
-        JSON.stringify({ error: "AI gateway error" }),
+        JSON.stringify({ error: `AI gateway error: ${response.status} - ${errorText}` }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
