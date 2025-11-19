@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Bot, User } from "lucide-react";
+import { Send, Bot, User, Volume2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VoiceInterface } from "./VoiceInterface";
@@ -25,7 +25,9 @@ export const ChatInterface = () => {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
 
   const scrollToBottom = () => {
@@ -97,6 +99,65 @@ export const ChatInterface = () => {
     setMessages((prev) => [...prev, newMessage]);
   };
 
+  const playTextToSpeech = async (text: string, messageId: string) => {
+    try {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+
+      setPlayingMessageId(messageId);
+
+      const { data, error } = await supabase.functions.invoke('text-to-speech', {
+        body: { text, voice: 'alloy' }
+      });
+
+      if (error) throw error;
+
+      const audioBlob = new Blob(
+        [Uint8Array.from(atob(data.audioContent), c => c.charCodeAt(0))],
+        { type: 'audio/mp3' }
+      );
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+
+      audio.onended = () => {
+        setPlayingMessageId(null);
+        URL.revokeObjectURL(audioUrl);
+      };
+
+      audio.onerror = () => {
+        setPlayingMessageId(null);
+        URL.revokeObjectURL(audioUrl);
+        toast({
+          title: "Playback Error",
+          description: "Failed to play audio",
+          variant: "destructive",
+        });
+      };
+
+      await audio.play();
+    } catch (error) {
+      console.error('Text-to-speech error:', error);
+      setPlayingMessageId(null);
+      toast({
+        title: "Speech Error",
+        description: "Failed to generate speech",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const stopAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+      setPlayingMessageId(null);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="border-b bg-card px-6 py-4">
@@ -118,26 +179,39 @@ export const ChatInterface = () => {
             className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}
           >
             {message.role === "assistant" && (
-              <div className="w-8 h-8 rounded-full bg-gradient-primary flex items-center justify-center flex-shrink-0">
-                <Bot className="w-5 h-5 text-white" />
-              </div>
+              <>
+                <div className="w-8 h-8 rounded-full bg-gradient-primary flex items-center justify-center flex-shrink-0">
+                  <Bot className="w-5 h-5 text-white" />
+                </div>
+                <div className="max-w-2xl rounded-2xl px-4 py-3 bg-muted text-foreground">
+                  <p className="text-sm leading-relaxed">{message.content}</p>
+                  <p className="text-xs mt-1 opacity-70">
+                    {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </p>
+                </div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => playingMessageId === message.id ? stopAudio() : playTextToSpeech(message.content, message.id)}
+                  className="flex-shrink-0 self-start"
+                  title={playingMessageId === message.id ? "Stop audio" : "Read aloud"}
+                >
+                  <Volume2 className={`w-4 h-4 ${playingMessageId === message.id ? 'text-primary' : ''}`} />
+                </Button>
+              </>
             )}
-            <div
-              className={`max-w-2xl rounded-2xl px-4 py-3 ${
-                message.role === "user"
-                  ? "bg-gradient-primary text-white"
-                  : "bg-muted text-foreground"
-              }`}
-            >
-              <p className="text-sm leading-relaxed">{message.content}</p>
-              <p className="text-xs mt-1 opacity-70">
-                {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-              </p>
-            </div>
             {message.role === "user" && (
-              <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
-                <User className="w-5 h-5 text-secondary-foreground" />
-              </div>
+              <>
+                <div className="max-w-2xl rounded-2xl px-4 py-3 bg-gradient-primary text-white">
+                  <p className="text-sm leading-relaxed">{message.content}</p>
+                  <p className="text-xs mt-1 opacity-70">
+                    {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </p>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
+                  <User className="w-5 h-5 text-secondary-foreground" />
+                </div>
+              </>
             )}
           </div>
         ))}
